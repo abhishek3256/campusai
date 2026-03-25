@@ -138,6 +138,10 @@ const CompanyDashboard = () => {
                         className="bg-violet-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-violet-700 transition shadow-lg text-sm font-medium">
                         <ClipboardList className="w-4 h-4" /> Create Exam
                     </Link>
+                    <Link to="/company/ranking"
+                        className="bg-teal-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-teal-700 transition shadow-lg text-sm font-medium">
+                        <Users className="w-4 h-4" /> Manage Candidates
+                    </Link>
                     <Link to="/company/post-job"
                         className="bg-blue-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-blue-700 transition shadow-lg text-sm font-medium">
                         <PlusCircle className="w-4 h-4" /> Post New Job

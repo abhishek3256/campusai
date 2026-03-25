@@ -467,6 +467,7 @@ exports.uploadApplicationDocument = async (req, res) => {
             application.status = 'documents-submitted';
         }
 
+        application.markModified('documents');
         await application.save();
         res.json({ success: true, data: application.documents });
     } catch (err) {

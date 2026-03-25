@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { ArrowLeft, Search, Filter, User, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Search, Filter, User, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
 import ApplicantDetailModal from '../components/company/ApplicantDetailModal';
 
 const CompanyApplicants = () => {
@@ -129,7 +129,15 @@ const CompanyApplicants = () => {
                                         <p className="text-sm text-gray-500 dark:text-gray-400">{app.studentId?.email}</p>
                                     </div>
                                 </div>
-                                {getStatusBadge(app.status)}
+                                <div className="flex flex-col items-end gap-2">
+                                    {getStatusBadge(app.status)}
+                                    {app.documents && app.documents.length > 0 && (
+                                        <span className="flex items-center text-xs font-semibold px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-full">
+                                            <FileText className="w-3 h-3 mr-1" />
+                                            {app.documents.length} Docs
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="space-y-3 mb-4">
