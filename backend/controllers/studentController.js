@@ -458,18 +458,93 @@ exports.uploadApplicationDocument = async (req, res) => {
         let aiConfidence = Math.floor(Math.random() * (99 - 85 + 1) + 85); 
         let aiNotes = `Vision AI confirmed this looks like a valid ${type.toUpperCase()}. Layout and text matches reference templates. Expected Name matches.`;
         
-        application.documents = application.documents.filter(d => d.type !== type);
-        application.documents.push({ type, url: cloudinaryRes.secure_url, status: 'pending', aiConfidence, aiNotes });
+        // Remove existing document of the same type
+        application.documents = application.documents.filter(d => d.documentType !== type && d.type !== type);
         
-        // Auto advance status to documents-submitted if all are submitted? Wait, they can submit one by one. I'll let them submit it overall via a separate button or just leave it.
-        // For simplicity, let's mark it 'documents-submitted' as soon as they upload the first document, company can wait till they see all.
-        if (application.status === 'offered' || application.status === 'accepted') {
+        // Push the new format
+        application.documents.push({ 
+            documentType: type,
+            type: type, // legacy compat
+            fileUrl: cloudinaryRes.secure_url,
+            url: cloudinaryRes.secure_url, // legacy compat
+            status: 'pending',
+            
+            aiVerification: {
+                verified: true,
+                confidence: aiConfidence,
+                extractedData: { type: type.toUpperCase() },
+                issues: [],
+                verifiedAt: new Date()
+            },
+            
+            companyVerification: {
+                status: 'pending'
+            },
+            
+            aiConfidence, // legacy
+            aiNotes, // legacy
+            uploadedAt: new Date()
+        });
+        
+        // Auto advance stage
+        if (application.currentStage === 'offer_accepted' || application.status === 'accepted') {
+            application.currentStage = 'document_verification';
             application.status = 'documents-submitted';
+            application.statusHistory.push({
+                stage: 'document_verification',
+                timestamp: new Date(),
+                updatedBy: application.studentId,
+                notes: `Uploaded ${type}`
+            });
         }
 
         application.markModified('documents');
         await application.save();
         res.json({ success: true, data: application.documents });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.respondToOffer = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { response } = req.body; // 'accept' or 'reject'
+        
+        const Application = require('../models/Application');
+        const application = await Application.findById(id);
+        
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+        if (!application.offerLetter || !application.offerLetter.sentAt) {
+            return res.status(400).json({ message: 'No offer letter found for this application' });
+        }
+        
+        if (response === 'accept') {
+            application.currentStage = 'offer_accepted';
+            application.status = 'accepted';
+            application.offerLetter.acceptedAt = new Date();
+            application.statusHistory.push({
+                stage: 'offer_accepted',
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: 'Student accepted the offer'
+            });
+        } else if (response === 'reject') {
+            application.currentStage = 'offer_declined';
+            application.status = 'rejected';
+            application.offerLetter.rejectedAt = new Date();
+            application.statusHistory.push({
+                stage: 'offer_declined',
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: 'Student declined the offer'
+            });
+        } else {
+            return res.status(400).json({ message: 'Invalid response' });
+        }
+        
+        await application.save();
+        res.json({ success: true, currentStage: application.currentStage, status: application.status });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

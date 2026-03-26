@@ -37,17 +37,20 @@ const AppliedJobsModal = ({ isOpen, onClose }) => {
         }
     };
 
-    const getStatusBadge = (status) => {
-        const config = {
-            pending: { class: 'badge-warning', icon: Clock, text: 'Pending' },
-            'under-review': { class: 'badge-info', icon: Clock, text: 'Under Review' },
-            shortlisted: { class: 'badge-success', icon: CheckCircle, text: 'Shortlisted' },
-            rejected: { class: 'badge-danger', icon: XCircle, text: 'Rejected' },
-            accepted: { class: 'badge-success', icon: CheckCircle, text: 'Accepted' }
-        };
-        const c = config[status] || config.pending;
-        const Icon = c.icon;
-        return <span className={`badge ${c.class} flex items-center`}><Icon className="w-3 h-3 mr-1" />{c.text}</span>;
+    const getStatusBadge = (app) => {
+        const displayLabel = app.currentStage ? app.currentStage.replace(/_/g, ' ').toUpperCase() : (app.status || 'PENDING').toUpperCase();
+        
+        if (['JOINED', 'JOINING LETTER ISSUED', 'DOCUMENTS VERIFIED', 'OFFER ACCEPTED', 'ACCEPTED'].includes(displayLabel) || app.status === 'joined' || app.status === 'accepted') {
+            return <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-lg text-xs font-bold tracking-wider flex items-center w-fit"><CheckCircle className="w-4 h-4 mr-1.5" /> {displayLabel}</span>;
+        } else if (['REJECTED', 'VERIFICATION FAILED'].includes(displayLabel) || app.status === 'rejected') {
+            return <span className="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-lg text-xs font-bold tracking-wider flex items-center w-fit"><XCircle className="w-4 h-4 mr-1.5" /> {displayLabel}</span>;
+        } else if (app.currentStage && app.currentStage !== 'applied') {
+            return <span className="px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 rounded-lg text-xs font-bold tracking-wider flex items-center w-fit"><Briefcase className="w-4 h-4 mr-1.5" /> {displayLabel}</span>;
+        } else if (['UNDER-REVIEW', 'SHORTLISTED', 'TECHNICAL-INTERVIEW', 'HR-INTERVIEW', 'OFFERED', 'DOCUMENTS-SUBMITTED'].includes(app.status?.toUpperCase())) {
+            return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-lg text-xs font-bold tracking-wider flex items-center w-fit"><Briefcase className="w-4 h-4 mr-1.5" /> {displayLabel}</span>;
+        } else {
+            return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-lg text-xs font-bold tracking-wider flex items-center w-fit"><Clock className="w-4 h-4 mr-1.5" /> PENDING</span>;
+        }
     };
 
 
@@ -102,7 +105,7 @@ const AppliedJobsModal = ({ isOpen, onClose }) => {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="ml-4">{getStatusBadge(app.status)}</div>
+                                                    <div className="ml-4">{getStatusBadge(app)}</div>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -150,10 +153,10 @@ const AppliedJobsModal = ({ isOpen, onClose }) => {
                                                     </button>
                                                 </div>
 
-                                                {app.aiGeneratedOfferLetter && (
+                                                {(app.aiGeneratedOfferLetter || app.offerLetter?.generatedAt) && (
                                                     <div className="mt-3">
                                                         <button 
-                                                            onClick={(e) => { e.stopPropagation(); setViewingLetter({ title: 'Offer Letter', content: app.aiGeneratedOfferLetter }); }}
+                                                            onClick={(e) => { e.stopPropagation(); setViewingLetter({ title: 'Offer Letter', content: app.offerLetter?.aiGeneratedContent || app.aiGeneratedOfferLetter }); }}
                                                             className="w-full flex items-center justify-center px-4 py-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg font-medium transition-all"
                                                         >
                                                             <FileText className="w-5 h-5 mr-2" /> Read Offer Letter
@@ -161,10 +164,10 @@ const AppliedJobsModal = ({ isOpen, onClose }) => {
                                                     </div>
                                                 )}
 
-                                                {app.aiGeneratedJoiningLetter && (
+                                                {(app.aiGeneratedJoiningLetter || app.joiningLetter?.generatedAt) && (
                                                     <div className="mt-3">
                                                         <button 
-                                                            onClick={(e) => { e.stopPropagation(); setViewingLetter({ title: 'Joining Letter', content: app.aiGeneratedJoiningLetter }); }}
+                                                            onClick={(e) => { e.stopPropagation(); setViewingLetter({ title: 'Joining Letter', content: app.joiningLetter?.aiGeneratedContent || app.aiGeneratedJoiningLetter }); }}
                                                             className="w-full flex items-center justify-center px-4 py-3 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg font-medium transition-all"
                                                         >
                                                             <FileText className="w-5 h-5 mr-2" /> Read Joining Letter
@@ -172,18 +175,18 @@ const AppliedJobsModal = ({ isOpen, onClose }) => {
                                                     </div>
                                                 )}
 
-                                                {(app.status === 'accepted' || app.status === 'offered' || app.status === 'documents-submitted' || app.status === 'documents-verified' || app.status === 'joined') && (
-                                                    <div className="mt-3">
+                                                {((app.currentStage && ['offer_accepted', 'document_verification', 'documents_verified', 'joining_letter_issued', 'joined'].includes(app.currentStage)) || (!app.currentStage && ['accepted', 'offered', 'documents-submitted', 'documents-verified', 'joined'].includes(app.status))) && (
+                                                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 onClose();
                                                                 navigate(`/student/application/${app._id}/documents`);
                                                             }}
-                                                            className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] shadow-lg"
+                                                            className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] shadow-sm"
                                                         >
                                                             <CheckCircle className="w-5 h-5 mr-2" />
-                                                            Upload & Verify Documents
+                                                            Upload & Manage Documents
                                                         </button>
                                                     </div>
                                                 )}

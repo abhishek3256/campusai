@@ -42,6 +42,10 @@ router.get('/resume-analysis', getResumeAnalysis);
 router.get('/recommended-jobs', getRecommendedJobs);
 router.get('/applications', getApplications);
 
+// Offer Response
+const { respondToOffer } = require('../controllers/studentController');
+router.put('/application/:id/offer/respond', respondToOffer);
+
 // Dashboard modal endpoints
 router.get('/profile-analysis', getProfileAnalysis);
 router.get('/applications-detailed', getApplicationsDetailed);

@@ -38,9 +38,18 @@ router.put('/jobs/:id/results', publishResults);
 router.get('/applicants/:jobId', getInternalApplicants);
 router.put('/application/:id/status', updateApplicationStatus);
 
+// Interview Tracking
+const { scheduleInterview, updateInterviewResult } = require('../controllers/companyController');
+router.post('/application/:id/schedule-interview', scheduleInterview);
+router.put('/application/:id/interview/:roundId/result', updateInterviewResult);
+
 // Letters
 router.post('/application/:id/generate-offer', generateOfferLetterEndpoint);
 router.post('/application/:id/generate-joining', generateJoiningLetterEndpoint);
+
+// Documents
+const { approveDocuments } = require('../controllers/companyController');
+router.put('/application/:id/documents/approve', approveDocuments);
 
 // AI
 router.post('/ai/job-description', createAIJobDesc);

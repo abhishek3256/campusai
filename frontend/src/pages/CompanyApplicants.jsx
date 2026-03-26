@@ -40,26 +40,19 @@ const CompanyApplicants = () => {
         return matchesFilter && matchesSearch;
     });
 
-    const getStatusBadge = (status) => {
-        const formatStatus = (s) => s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const getStatusBadge = (app) => {
+        const displayLabel = app.currentStage ? app.currentStage.replace(/_/g, ' ').toUpperCase() : (app.status || 'PENDING').toUpperCase();
         
-        switch (status) {
-            case 'joined':
-            case 'accepted':
-            case 'documents-verified':
-                return <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-xs font-semibold flex items-center w-fit"><CheckCircle className="w-3 h-3 mr-1" /> {formatStatus(status)}</span>;
-            case 'rejected':
-            case 'verification-failed':
-                return <span className="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-xs font-semibold flex items-center w-fit"><AlertCircle className="w-3 h-3 mr-1" /> {formatStatus(status)}</span>;
-            case 'under-review':
-            case 'shortlisted':
-            case 'technical-interview':
-            case 'hr-interview':
-            case 'offered':
-            case 'documents-submitted':
-                return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-full text-xs font-semibold flex items-center w-fit"><User className="w-3 h-3 mr-1" /> {formatStatus(status)}</span>;
-            default:
-                return <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full text-xs font-semibold flex items-center w-fit"><Clock className="w-3 h-3 mr-1" /> Pending</span>;
+        if (['JOINED', 'JOINING LETTER ISSUED', 'DOCUMENTS VERIFIED', 'OFFER ACCEPTED', 'ACCEPTED'].includes(displayLabel) || app.status === 'joined' || app.status === 'accepted') {
+            return <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><CheckCircle className="w-3 h-3 mr-1" /> {displayLabel}</span>;
+        } else if (['REJECTED', 'VERIFICATION FAILED'].includes(displayLabel) || app.status === 'rejected') {
+            return <span className="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><AlertCircle className="w-3 h-3 mr-1" /> {displayLabel}</span>;
+        } else if (app.currentStage && app.currentStage !== 'applied') {
+            return <span className="px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><User className="w-3 h-3 mr-1" /> {displayLabel}</span>;
+        } else if (['UNDER-REVIEW', 'SHORTLISTED', 'TECHNICAL-INTERVIEW', 'HR-INTERVIEW', 'OFFERED', 'DOCUMENTS-SUBMITTED'].includes(app.status?.toUpperCase())) {
+            return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><User className="w-3 h-3 mr-1" /> {displayLabel}</span>;
+        } else {
+            return <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><Clock className="w-3 h-3 mr-1" /> PENDING</span>;
         }
     };
 
@@ -130,7 +123,7 @@ const CompanyApplicants = () => {
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
-                                    {getStatusBadge(app.status)}
+                                    {getStatusBadge(app)}
                                     {app.documents && app.documents.length > 0 && (
                                         <span className="flex items-center text-xs font-semibold px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-full">
                                             <FileText className="w-3 h-3 mr-1" />

@@ -84,48 +84,68 @@ const generateCoverLetter = async (student, job) => {
     return JSON.parse(completion.choices[0].message.content).coverLetter;
 };
 
-const generateOfferLetter = async (student, job, offerDetails) => {
+const generateOfferLetter = async (studentName, jobTitle, companyName, ctc, joiningDate) => {
     const prompt = `
-    Generate a formal offer letter for:
-    Student Name: ${student.name}
-    Position: ${job.title}
-    Company: ${job.company}
-    Salary: ${offerDetails.salary}
-    Start Date: ${offerDetails.startDate}
-    
-    Include standard terms, benefits, and professional formatting.
-    Return as JSON: { "offerLetter": "text..." }
+    Generate a professional offer letter with the following details:
+
+    COMPANY: ${companyName}
+    STUDENT: ${studentName}
+    POSITION: ${jobTitle}
+    CTC: ₹${ctc} per annum
+    JOINING DATE: ${joiningDate}
+
+    Include:
+    - Formal greeting
+    - Position details and responsibilities
+    - Compensation breakdown (base + benefits)
+    - Joining date and location
+    - Terms and conditions
+    - Acceptance deadline
+    - Contact information
+    - Professional closing
+
+    Format as a formal business letter.
+    Return ONLY the letter content, no markdown format (no wrapping \`\`\`).
     `;
 
     const completion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
-        response_format: { type: 'json_object' }
+        temperature: 0.7
     });
-    return JSON.parse(completion.choices[0].message.content).offerLetter;
+    return completion.choices[0].message.content;
 };
 
-const generateJoiningLetter = async (student, job, details) => {
+const generateJoiningLetter = async (studentName, jobTitle, companyName, joiningDate, reportingTime, reportingLocation) => {
     const prompt = `
-    Generate a formal joining letter (Letter of Appointment) for:
-    Student Name: ${student.name}
-    Position: ${job.title}
-    Company: ${job.companyName || 'the company'}
-    Reporting Manager: ${details.manager || 'HR Department'}
-    Reporting Time: ${details.time || '9:00 AM'}
-    Reporting Date: ${details.date || 'To be decided'}
-    Location: ${details.location || 'Company Headquarters'}
-    
-    Include standard welcoming remarks, instructions for the first day, and a list of required documents to bring (PAN, Aadhaar, Educational Certificates, etc.).
-    Return as JSON: { "joiningLetter": "markdown text..." }
+    Generate a joining letter for:
+
+    STUDENT: ${studentName}
+    POSITION: ${jobTitle}
+    COMPANY: ${companyName}
+    JOINING DATE: ${joiningDate}
+    REPORTING TIME: ${reportingTime}
+    LOCATION: ${reportingLocation}
+
+    Include:
+    - Warm welcome message
+    - Joining date, time, and location
+    - Documents to bring on first day
+    - Dress code
+    - Contact person details
+    - Parking/transportation info if applicable
+    - First day schedule overview
+
+    Make it friendly yet professional.
+    Return ONLY the letter content, no markdown format (no wrapping \`\`\`).
     `;
 
     const completion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
-        response_format: { type: 'json_object' }
+        temperature: 0.7
     });
-    return JSON.parse(completion.choices[0].message.content).joiningLetter;
+    return completion.choices[0].message.content;
 };
 
 const generateCareerGuidance = async (profile) => {

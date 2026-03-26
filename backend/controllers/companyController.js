@@ -150,26 +150,179 @@ exports.createAIEligibility = async (req, res) => {
 exports.updateApplicationStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body;
-        const application = await Application.findByIdAndUpdate(id, { status }, { new: true });
+        const { status, notes, stage } = req.body;
+        
+        const application = await Application.findById(id);
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+        
+        if (status) application.status = status;
+        
+        let newStage = stage;
+        if (!newStage) {
+            // Map legacy status to new stage
+            switch (status) {
+                case 'under-review': newStage = 'under_review'; break;
+                case 'shortlisted': newStage = 'under_review'; break; // or assessment_assigned
+                case 'technical-interview': newStage = 'technical_interview'; break;
+                case 'hr-interview': newStage = 'hr_interview'; break;
+                case 'offered': newStage = 'offer_sent'; break;
+                case 'accepted': newStage = 'selected'; break;
+                case 'documents-submitted': newStage = 'document_verification'; break;
+                case 'documents-verified': newStage = 'documents_verified'; break;
+                case 'joined': newStage = 'joined'; break;
+                case 'rejected': newStage = 'rejected'; break;
+            }
+        }
+        
+        if (newStage && newStage !== application.currentStage) {
+            application.currentStage = newStage;
+            application.statusHistory.push({
+                stage: newStage,
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: notes || `Status updated to ${status}`
+            });
+            if (newStage === 'rejected') {
+                application.rejectedAt = new Date();
+                application.rejectionReason = notes || 'Rejected during review';
+            }
+            if (newStage === 'joined') {
+                application.joinedAt = new Date();
+            }
+        }
+
+        await application.save();
         res.json(application);
     } catch (error) {
+        console.error('Update status error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// ── Interview Tracking ─────────────────────────────────
+exports.scheduleInterview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { roundName, scheduledDate, scheduledTime, mode, meetingLink, location, interviewerName, interviewerEmail } = req.body;
+        
+        const application = await Application.findById(id);
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+        
+        const roundNumber = application.interviewRounds.length + 1;
+        application.interviewRounds.push({
+            roundNumber,
+            roundName,
+            scheduledDate,
+            scheduledTime,
+            mode,
+            meetingLink,
+            location,
+            interviewerName,
+            interviewerEmail,
+            status: 'scheduled'
+        });
+        
+        // Update stage based on round name if needed
+        let newStage = application.currentStage;
+        if (roundName === 'Technical Interview') newStage = 'technical_interview';
+        if (roundName === 'Managerial Interview') newStage = 'managerial_interview';
+        if (roundName === 'HR Interview') newStage = 'hr_interview';
+        
+        if (newStage !== application.currentStage) {
+            application.currentStage = newStage;
+            application.statusHistory.push({
+                stage: newStage,
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: `Scheduled ${roundName}`
+            });
+            
+            // Map legacy status
+            if (newStage === 'technical_interview') application.status = 'technical-interview';
+            if (newStage === 'hr_interview') application.status = 'hr-interview';
+        }
+        
+        await application.save();
+        res.status(200).json({ success: true, interviewRounds: application.interviewRounds, currentStage: application.currentStage, status: application.status });
+    } catch (error) {
+        console.error('Schedule interview error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.updateInterviewResult = async (req, res) => {
+    try {
+        const { id, roundId } = req.params;
+        const { result, feedback } = req.body;
+        
+        const application = await Application.findById(id);
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+        
+        const round = application.interviewRounds.id(roundId);
+        if (!round) return res.status(404).json({ message: 'Interview round not found' });
+        
+        round.result = result;
+        round.feedback = feedback;
+        round.status = 'completed';
+        round.completedAt = new Date();
+        
+        if (result === 'fail') {
+            application.currentStage = 'rejected';
+            application.status = 'rejected';
+            application.rejectedAt = new Date();
+            application.rejectionReason = feedback || `Failed at ${round.roundName}`;
+            application.statusHistory.push({
+                stage: 'rejected',
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: application.rejectionReason
+            });
+        }
+        
+        await application.save();
+        res.status(200).json({ success: true, interviewRounds: application.interviewRounds, currentStage: application.currentStage });
+    } catch (error) {
+        console.error('Update interview result error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
 exports.generateOfferLetterEndpoint = async (req, res) => {
     try {
-        const application = await Application.findById(req.params.id).populate('studentId').populate('jobId');
+        const application = await Application.findById(req.params.id)
+            .populate('studentId')
+            .populate({ path: 'jobId', populate: { path: 'companyId' } })
+            .populate('companyId');
+            
         if (!application) return res.status(404).json({ message: 'Application not found' });
         
-        const offerDetails = req.body.offerDetails || { salary: 'As per industry standards', startDate: 'Immediately' };
+        const { ctc, joiningDate, offerDetails } = req.body;
+        const studentName = application.studentId?.name || 'Candidate';
+        const jobTitle = application.jobId?.title || 'Position';
+        const companyName = application.companyId?.companyName || 'The Company';
+        const finalCtc = ctc || application.jobId?.salary?.max || 0;
+        const finalJoiningDate = joiningDate || 'To be decided';
         
-        const letter = await generateOfferLetter(application.studentId, { ...application.jobId.toObject(), company: 'Your Company' }, offerDetails);
-        application.aiGeneratedOfferLetter = letter;
+        const letter = await generateOfferLetter(studentName, jobTitle, companyName, finalCtc, finalJoiningDate);
+        
+        application.offerLetter = {
+            generatedAt: new Date(),
+            sentAt: new Date(),
+            ctc: finalCtc,
+            joiningDate: new Date(finalJoiningDate) || undefined,
+            aiGeneratedContent: letter
+        };
+        
+        application.currentStage = 'offer_sent';
         application.status = 'offered'; 
-        await application.save();
+        application.statusHistory.push({
+            stage: 'offer_sent',
+            timestamp: new Date(),
+            updatedBy: req.user._id,
+            notes: 'Offer letter generated and sent via AI'
+        });
         
+        await application.save();
         res.json({ success: true, letter, data: application });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -178,17 +331,42 @@ exports.generateOfferLetterEndpoint = async (req, res) => {
 
 exports.generateJoiningLetterEndpoint = async (req, res) => {
     try {
-        const application = await Application.findById(req.params.id).populate('studentId').populate('jobId');
-        const company = await Company.findOne({ userId: req.user._id });
+        const application = await Application.findById(req.params.id)
+            .populate('studentId')
+            .populate({ path: 'jobId', populate: { path: 'companyId' } })
+            .populate('companyId');
+            
+        if (!application) return res.status(404).json({ message: 'Application not found' });
         
-        const details = req.body.details || { manager: 'HR Dept', time: '9:00 AM', date: 'TBD', location: 'Office' };
-        const jobWithCompany = { ...application.jobId.toObject(), companyName: company.companyName };
+        const { joiningDate, reportingTime, reportingLocation, details } = req.body;
+        const studentName = application.studentId?.name || 'Candidate';
+        const jobTitle = application.jobId?.title || 'Position';
+        const companyName = application.companyId?.companyName || 'The Company';
+
+        const finalJoiningDate = joiningDate || application.offerLetter?.joiningDate || 'Your confirmed joining date';
+        const finalTime = reportingTime || details?.time || '10:00 AM';
+        const finalLocation = reportingLocation || details?.location || 'Company Headquarters';
+
+        const letter = await generateJoiningLetter(studentName, jobTitle, companyName, finalJoiningDate, finalTime, finalLocation);
         
-        const letter = await generateJoiningLetter(application.studentId, jobWithCompany, details);
-        application.aiGeneratedJoiningLetter = letter;
-        application.status = 'joined'; 
+        application.joiningLetter = {
+            generatedAt: new Date(),
+            sentAt: new Date(),
+            joiningDate: new Date(finalJoiningDate) || undefined,
+            reportingTime: finalTime,
+            reportingLocation: finalLocation,
+            aiGeneratedContent: letter
+        };
+        
+        application.currentStage = 'joining_letter_issued';
+        application.statusHistory.push({
+            stage: 'joining_letter_issued',
+            timestamp: new Date(),
+            updatedBy: req.user._id,
+            notes: 'Joining letter generated and issued via AI'
+        });
+        
         await application.save();
-        
         res.json({ success: true, letter, data: application });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -291,6 +469,45 @@ exports.verifySkill = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
+    }
+};
+
+// ── Documents ─────────────────────────────────
+exports.approveDocuments = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { documentId, status, remarks } = req.body; // status: 'approved', 'rejected'
+        
+        const application = await Application.findById(id);
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+        
+        const doc = application.documents.id(documentId);
+        if (!doc) return res.status(404).json({ message: 'Document not found' });
+        
+        doc.companyVerification = {
+            status,
+            verifiedBy: req.user._id,
+            verifiedAt: new Date(),
+            remarks
+        };
+        doc.status = status === 'approved' ? 'verified' : 'rejected';
+        
+        const allApproved = application.documents.every(d => d.companyVerification?.status === 'approved' || d.status === 'verified');
+        if (allApproved && application.documents.length > 0) {
+            application.currentStage = 'documents_verified';
+            application.status = 'documents-verified';
+            application.statusHistory.push({
+                stage: 'documents_verified',
+                timestamp: new Date(),
+                updatedBy: req.user._id,
+                notes: 'All documents verified'
+            });
+        }
+        
+        await application.save();
+        res.json({ success: true, documents: application.documents, currentStage: application.currentStage });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };
 

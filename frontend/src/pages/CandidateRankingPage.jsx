@@ -22,7 +22,7 @@ export default function CandidateRankingPage() {
     useEffect(() => { fetchJobs(); }, []);
 
     const fetchJobs = async () => {
-        try { setLoadingJobs(true); const res = await api.get('/company/jobs'); setJobs(res.data.jobs || []); }
+        try { setLoadingJobs(true); const res = await api.get('/company/jobs'); setJobs(res.data?.jobs ? res.data.jobs : (Array.isArray(res.data) ? res.data : [])); }
         catch { toast.error('Failed to load jobs'); } finally { setLoadingJobs(false); }
     };
 
