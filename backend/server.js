@@ -14,6 +14,9 @@ connectDB();
 
 const app = express();
 
+// Trust reverse proxy (Vercel/Render) for express-rate-limit to work correctly
+app.set('trust proxy', 1);
+
 const path = require('path');
 
 // Middleware
