@@ -9,12 +9,14 @@ import InterviewManager from './InterviewManager';
 import OfferLetterManager from './OfferLetterManager';
 import DocumentVerificationPanel from './DocumentVerificationPanel';
 import JoiningLetterManager from './JoiningLetterManager';
+import ResumeViewModal from '../student/modals/ResumeViewModal';
 
 const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }) => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [activeTab, setActiveTab] = useState('overview'); // overview, timeline, documents, offer, joining
     const [statusUpdating, setStatusUpdating] = useState(false);
+    const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen && applicationId) {
@@ -93,6 +95,7 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
     ];
 
     return (
+        <>
         <AnimatePresence>
             <div className="fixed inset-0 z-50 overflow-hidden">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm" />
@@ -212,9 +215,11 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
                                                             <FileText className="w-5 h-5 mr-3 text-indigo-500" /> Resume Profile
                                                         </h3>
                                                         {data?.studentId?.resume?.fileUrl && (
-                                                            <a href={data.studentId.resume.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center text-sm px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">
+                                                            <button 
+                                                                onClick={() => setIsResumeModalOpen(true)}
+                                                                className="flex items-center text-sm px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">
                                                                 <ExternalLink className="w-4 h-4 mr-1.5" /> View PDF Form
-                                                            </a>
+                                                            </button>
                                                         )}
                                                     </div>
                                                     <div className="space-y-6">
@@ -329,6 +334,13 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
                 </div>
             </div>
         </AnimatePresence>
+
+        <ResumeViewModal
+            isOpen={isResumeModalOpen}
+            onClose={() => setIsResumeModalOpen(false)}
+            resumeUrl={data?.studentId?.resume?.fileUrl}
+        />
+        </>
     );
 };
 
