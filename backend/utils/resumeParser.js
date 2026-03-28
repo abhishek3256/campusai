@@ -295,6 +295,7 @@ Return ONLY the JSON object, no explanations.`;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Parsing resume with AI (attempt ${attempt}/${maxRetries})...`);
+      console.log(`[HOT-DEBUG] SDK Key Starts With: ${groq.apiKey ? groq.apiKey.substring(0, 4) : 'UNDEFINED'} | Length: ${groq.apiKey ? groq.apiKey.length : 0}`);
       
       const response = await callGroqAPI(userPrompt, systemPrompt);
       const parsedData = parseAIResponse(response);
