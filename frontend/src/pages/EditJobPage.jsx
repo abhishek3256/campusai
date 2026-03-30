@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Check, Save, Sparkles, X } from 'lucide-react';
+import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Check, Save, Sparkles, X, GitBranch } from 'lucide-react';
+import PipelineBuilder from '../components/company/PipelineBuilder';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -11,6 +12,7 @@ const TABS = [
     { id: 2, label: 'Eligibility', icon: GraduationCap },
     { id: 3, label: 'Skills', icon: Code2 },
     { id: 4, label: 'Timeline', icon: Calendar },
+    { id: 5, label: 'Pipeline', icon: GitBranch },
 ];
 
 const BRANCHES = ['Computer Science', 'Information Technology', 'Electronics', 'Electrical', 'Mechanical', 'Civil', 'Chemical', 'Biotechnology', 'MBA', 'MCA'];
@@ -70,7 +72,8 @@ export default function EditJobPage() {
         bondDuration: '', bondConditions: '', vacancies: 1,
         minCGPA: '', branches: [], passingYear: '', academicRequirements: '',
         mustHave: [], goodToHave: [], technologies: [],
-        applicationDeadline: '', shortlistingDate: '', examDate: '', interviewDate: '', finalSelectionDate: ''
+        applicationDeadline: '', shortlistingDate: '', examDate: '', interviewDate: '', finalSelectionDate: '',
+        pipelineStages: []
     });
 
     useEffect(() => {
@@ -107,6 +110,7 @@ export default function EditJobPage() {
                     examDate: fmt(j.timeline?.examDate),
                     interviewDate: fmt(j.timeline?.interviewDate),
                     finalSelectionDate: fmt(j.timeline?.finalSelectionDate),
+                    pipelineStages: j.recruitmentPipeline?.stages || []
                 });
             } catch { toast.error('Failed to load job'); navigate('/company/dashboard'); }
             finally { setLoading(false); }
@@ -193,6 +197,10 @@ export default function EditJobPage() {
                     finalSelectionDate: form.finalSelectionDate || null,
                 },
                 deadline: form.applicationDeadline || null,
+                recruitmentPipeline: {
+                    stages: form.pipelineStages,
+                    autoRejectOnFailure: false
+                }
             };
             await api.put(`/company/jobs/${id}`, payload);
             toast.success('Job updated successfully!');
@@ -359,6 +367,40 @@ export default function EditJobPage() {
                                         </Field>
                                     ))}
                                 </div>
+                                <p className="text-sm text-gray-500">Students will see these dates on the job listing and in their application tracker.</p>
+                            </div>
+                        )}
+
+                        {tab === 5 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recruitment Pipeline</h2>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                            Define the hiring stages students will go through. AI will auto-generate letters for Offer, Joining, and Employment stages.
+                                        </p>
+                                    </div>
+                                    {form.pipelineStages.length > 0 && (
+                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                                            {form.pipelineStages.length} stages
+                                        </span>
+                                    )}
+                                </div>
+
+                                <PipelineBuilder
+                                    stages={form.pipelineStages}
+                                    onStagesChange={stages => set('pipelineStages', stages)}
+                                />
+
+                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 mt-6">
+                                    <p className="font-semibold mb-1">💡 Pipeline Tips</p>
+                                    <ul className="list-disc ml-4 space-y-1">
+                                        <li>Add <strong>Online Assessment</strong> to automatically link any exam you create</li>
+                                        <li>Add <strong>Offer Letter</strong> to enable AI-powered offer letter generation</li>
+                                        <li>Add <strong>Document Verification</strong> to collect student documents</li>
+                                        <li>Add <strong>Joining Letter</strong> and <strong>Letter of Employment</strong> for post-selection stages</li>
+                                    </ul>
+                                </div>
                             </div>
                         )}
                     </motion.div>
@@ -368,7 +410,7 @@ export default function EditJobPage() {
                             className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl disabled:opacity-40 transition-all">
                             <ChevronLeft className="w-4 h-4" /> Back
                         </button>
-                        {tab < 4 ? (
+                        {tab < 5 ? (
                             <button type="button" onClick={() => setTab(t => t + 1)}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium">
                                 Next <ChevronRight className="w-4 h-4" />
