@@ -8,7 +8,7 @@ const {
     verifySkill, bulkVerifySkills,
     autoShortlist, publishResults,
     updateJob, deleteJob,
-    generateOfferLetterEndpoint, generateJoiningLetterEndpoint
+    generateOfferLetterEndpoint, generateJoiningLetterEndpoint, generateEmploymentLetterEndpoint
 } = require('../controllers/companyController');
 const { getRankedApplicants } = require('../controllers/analyticsController');
 const { createSchedule, getSchedulesByCompany, updateSchedule, cancelSchedule } = require('../controllers/scheduleController');
@@ -46,6 +46,7 @@ router.put('/application/:id/interview/:roundId/result', updateInterviewResult);
 // Letters
 router.post('/application/:id/generate-offer', generateOfferLetterEndpoint);
 router.post('/application/:id/generate-joining', generateJoiningLetterEndpoint);
+router.post('/application/:id/generate-employment', generateEmploymentLetterEndpoint);
 
 // Documents
 const { approveDocuments } = require('../controllers/companyController');

@@ -34,25 +34,51 @@ const CompanyApplicants = () => {
     };
 
     const filteredApplicants = applicants.filter(app => {
-        const matchesFilter = filter === 'all' || app.status === filter;
+        const appStatus = app.overallStatus || app.status || 'Application Pending';
+        const matchesFilter = filter === 'all' || appStatus === filter;
         const matchesSearch = (app.studentId?.name || '').toLowerCase().includes(search.toLowerCase()) ||
             (app.studentId?.email || '').toLowerCase().includes(search.toLowerCase());
         return matchesFilter && matchesSearch;
     });
 
     const getStatusBadge = (app) => {
-        const displayLabel = app.currentStage ? app.currentStage.replace(/_/g, ' ').toUpperCase() : (app.status || 'PENDING').toUpperCase();
-        
-        if (['JOINED', 'JOINING LETTER ISSUED', 'DOCUMENTS VERIFIED', 'OFFER ACCEPTED', 'ACCEPTED'].includes(displayLabel) || app.status === 'joined' || app.status === 'accepted') {
-            return <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><CheckCircle className="w-3 h-3 mr-1" /> {displayLabel}</span>;
-        } else if (['REJECTED', 'VERIFICATION FAILED'].includes(displayLabel) || app.status === 'rejected') {
-            return <span className="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><AlertCircle className="w-3 h-3 mr-1" /> {displayLabel}</span>;
-        } else if (app.currentStage && app.currentStage !== 'applied') {
-            return <span className="px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><User className="w-3 h-3 mr-1" /> {displayLabel}</span>;
-        } else if (['UNDER-REVIEW', 'SHORTLISTED', 'TECHNICAL-INTERVIEW', 'HR-INTERVIEW', 'OFFERED', 'DOCUMENTS-SUBMITTED'].includes(app.status?.toUpperCase())) {
-            return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><User className="w-3 h-3 mr-1" /> {displayLabel}</span>;
+        const overall = app.overallStatus;
+        const legacy = app.status;
+
+        if (overall) {
+            const colors = {
+                'Application Pending': 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+                'Application Under Review': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                'Application Shortlisted': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                'Application Rejected': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                'In Progress': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+                'Selected': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                'Offer Accepted': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+                'Joined': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                'Offer Rejected': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                'Withdrawn': 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400',
+            };
+            const icons = {
+                'Application Pending': '📋', 'Application Under Review': '🔍',
+                'Application Shortlisted': '✅', 'Application Rejected': '❌',
+                'In Progress': '⚙️', 'Selected': '🎉',
+                'Offer Accepted': '🤝', 'Joined': '🏢',
+                'Offer Rejected': '🚫', 'Withdrawn': '↩️'
+            };
+            return (
+                <span className={`px-2 py-1 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit gap-1 ${colors[overall] || 'bg-gray-100 text-gray-700'}`}>
+                    {icons[overall]} {overall}
+                </span>
+            );
+        }
+
+        // Fallback to legacy status badge
+        if (['joined', 'accepted'].includes(legacy)) {
+            return <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><CheckCircle className="w-3 h-3 mr-1" /> {legacy?.toUpperCase()}</span>;
+        } else if (legacy === 'rejected') {
+            return <span className="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><AlertCircle className="w-3 h-3 mr-1" /> REJECTED</span>;
         } else {
-            return <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><Clock className="w-3 h-3 mr-1" /> PENDING</span>;
+            return <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full text-[10px] font-bold tracking-wider flex items-center w-fit"><Clock className="w-3 h-3 mr-1" /> {legacy?.toUpperCase() || 'PENDING'}</span>;
         }
     };
 
@@ -84,16 +110,24 @@ const CompanyApplicants = () => {
 
                 <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
                     <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400 hidden md:block" />
-                    {['all', 'pending', 'under-review', 'shortlisted', 'technical-interview', 'hr-interview', 'offered', 'documents-submitted', 'joined'].map(status => (
+                    {[
+                        { label: 'All Candidates', value: 'all' },
+                        { label: '📋 Application Pending', value: 'Application Pending' },
+                        { label: '🔍 Application Under Review', value: 'Application Under Review' },
+                        { label: '✅ Application Shortlisted', value: 'Application Shortlisted' },
+                        { label: '⚙️ In Pipeline', value: 'In Progress' },
+                        { label: '🎉 Selected', value: 'Selected' },
+                        { label: '❌ Application Reject', value: 'Application Rejected' },
+                    ].map(({ label, value }) => (
                         <button
-                            key={status}
-                            onClick={() => setFilter(status)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filter === status
+                            key={value}
+                            onClick={() => setFilter(value)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filter === value
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                                 }`}
                         >
-                            {status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                            {label}
                         </button>
                     ))}
                 </div>

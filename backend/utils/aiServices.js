@@ -255,11 +255,43 @@ const recommendJobs = async (studentProfile, jobsList) => {
     return JSON.parse(completion.choices[0].message.content);
 }
 
+const generateEmploymentLetter = async (studentName, jobTitle, companyName, joiningDate, employeeId) => {
+    const prompt = `
+Generate a professional Letter of Employment for:
+
+COMPANY: ${companyName}
+EMPLOYEE NAME: ${studentName}
+DESIGNATION: ${jobTitle}
+DATE OF JOINING: ${joiningDate}
+EMPLOYEE ID: ${employeeId || 'To be assigned'}
+DATE: ${new Date().toLocaleDateString('en-IN')}
+
+This letter confirms employment and includes:
+- Official statement of employment
+- Employee name, designation, and department
+- Date of joining
+- Confirmation that the employee is a full-time employee in good standing
+- Statement for bank/visa/external verification purposes
+- Company seal/signatory information
+
+Make it formal, official, and suitable for submission to banks, embassies, or other institutions.
+Return ONLY the letter content, no markdown format (no wrapping \`\`\`).
+    `;
+
+    const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.5
+    });
+    return completion.choices[0].message.content;
+};
+
 module.exports = {
     generateJobDescription,
     generateCoverLetter,
     generateOfferLetter,
     generateJoiningLetter,
+    generateEmploymentLetter,
     generateCareerGuidance,
     generateInterviewQuestions,
     detectResumeFraud,

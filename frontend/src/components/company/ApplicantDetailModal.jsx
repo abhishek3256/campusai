@@ -9,6 +9,7 @@ import InterviewManager from './InterviewManager';
 import OfferLetterManager from './OfferLetterManager';
 import DocumentVerificationPanel from './DocumentVerificationPanel';
 import JoiningLetterManager from './JoiningLetterManager';
+import EmploymentLetterManager from './EmploymentLetterManager';
 import ResumeViewModal from '../student/modals/ResumeViewModal';
 
 const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }) => {
@@ -46,13 +47,41 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
     const handleStatusUpdate = async (newStatus) => {
         try {
             setStatusUpdating(true);
-            const { data: updateRes } = await api.put(`/company/application/${applicationId}/status`, { status: newStatus });
-            toast.success(`Application status updated to ${newStatus}`);
-            setData(updateRes); 
+            await api.put(`/applications/${applicationId}/status`, { status: newStatus });
+            toast.success(`Status updated to: ${newStatus}`);
+            fetchApplicantDetails();
             if (onStatusUpdate) onStatusUpdate();
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('Failed to update status');
+        } finally {
+            setStatusUpdating(false);
+        }
+    };
+
+    const handleAdvanceStage = async () => {
+        try {
+            setStatusUpdating(true);
+            await api.post(`/applications/${applicationId}/advance-stage`, { passCurrentStage: true });
+            toast.success('Advanced to next pipeline stage!');
+            fetchApplicantDetails();
+            if (onStatusUpdate) onStatusUpdate();
+        } catch (error) {
+            toast.error('Failed to advance stage');
+        } finally {
+            setStatusUpdating(false);
+        }
+    };
+
+    const handleFailStage = async () => {
+        try {
+            setStatusUpdating(true);
+            await api.post(`/applications/${applicationId}/fail-stage`, { reason: 'Rejected at current stage' });
+            toast.success('Application rejected at current stage');
+            fetchApplicantDetails();
+            if (onStatusUpdate) onStatusUpdate();
+        } catch (error) {
+            toast.error('Failed to reject at stage');
         } finally {
             setStatusUpdating(false);
         }
@@ -272,20 +301,60 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
                                                     <h5 className="font-bold text-gray-900 dark:text-white mb-2">{data?.jobId?.title}</h5>
                                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{data?.jobId?.location || 'Remote'}</p>
                                                     <div className="mb-6">
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Manual Status Override</label>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Application Status</label>
                                                         <select 
-                                                            value={data?.status || 'pending'} 
+                                                            value={data?.overallStatus || data?.status || 'Application Pending'} 
                                                             onChange={(e) => handleStatusUpdate(e.target.value)}
                                                             disabled={statusUpdating}
                                                             className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500/30"
                                                         >
-                                                            <option value="pending">Pending</option>
-                                                            <option value="under-review">Under Review</option>
-                                                            <option value="shortlisted">Shortlisted</option>
-                                                            <option value="rejected">Rejected</option>
+                                                            <option value="Application Pending">📋 Application Pending</option>
+                                                            <option value="Application Under Review">🔍 Application Under Review</option>
+                                                            <option value="Application Shortlisted">✅ Application Shortlisted</option>
+                                                            <option value="Application Rejected">❌ Application Reject</option>
+                                                            <option value="In Progress">⚙️ In Pipeline (Assessment/Interview)</option>
+                                                            <option value="Selected">🎉 Selected</option>
+                                                            <option value="Offer Accepted">🤝 Offer Accepted</option>
+                                                            <option value="Offer Rejected">🚫 Offer Rejected</option>
+                                                            <option value="Joined">🏢 Joined</option>
+                                                            <option value="Withdrawn">↩️ Withdrawn</option>
                                                         </select>
-                                                        <p className="text-xs text-gray-400 mt-2">Use Pipeline tab to progress stages systematically.</p>
+                                                        <p className="text-xs text-gray-400 mt-2">Use Pipeline tab to advance through stages.</p>
                                                     </div>
+
+                                                    {/* Pipeline Stage Actions */}
+                                                    {(data?.overallStatus === 'Application Shortlisted' || data?.overallStatus === 'In Progress') && (
+                                                        <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+                                                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Pipeline Actions</p>
+                                                            {data?.overallStatus === 'Application Shortlisted' && (
+                                                                <button
+                                                                    onClick={handleAdvanceStage}
+                                                                    disabled={statusUpdating}
+                                                                    className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                                                >
+                                                                    🚀 Start Pipeline
+                                                                </button>
+                                                            )}
+                                                            {data?.overallStatus === 'In Progress' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={handleAdvanceStage}
+                                                                        disabled={statusUpdating}
+                                                                        className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        ✅ Pass &amp; Advance Stage
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={handleFailStage}
+                                                                        disabled={statusUpdating}
+                                                                        className="w-full py-2 px-3 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        ❌ Fail &amp; Reject
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -298,26 +367,44 @@ const ApplicantDetailModal = ({ isOpen, onClose, applicationId, onStatusUpdate }
                                             <ApplicationTimeline 
                                                 currentStage={data.currentStage} 
                                                 statusHistory={data.statusHistory} 
-                                                isRejected={data.status === 'rejected'}
+                                                isRejected={data.status === 'rejected' || data.overallStatus === 'Application Rejected'}
+                                                pipelineProgress={data.pipelineProgress}
                                             />
                                             
                                             <div className="grid grid-cols-1 gap-6">
                                                 {/* Interviews Module */}
                                                 <InterviewManager application={data} onUpdate={handleDataUpdate} />
                                                 
-                                                {/* Offer Module */}
-                                                {(data.currentStage === 'offer_sent' || data.currentStage === 'offer_accepted' || data.status === 'offered' || data.status === 'accepted' || data.currentStage === 'selected' || data.offerLetter?.generatedAt) && (
+                                                {/* Offer Module — show when offer stage active or already generated */}
+                                                {(data.currentStage === 'offer_sent' || data.currentStage === 'offer_accepted' || 
+                                                  data.status === 'offered' || data.status === 'accepted' || 
+                                                  data.currentStage === 'selected' || data.offerLetter?.generatedAt ||
+                                                  data.overallStatus === 'Selected' || data.overallStatus === 'Offer Accepted' || data.overallStatus === 'In Progress' ||
+                                                  data.pipelineProgress?.stageResults?.some(s => s.stageName === 'Offer Letter' && ['in_progress', 'passed'].includes(s.status))) && (
                                                     <OfferLetterManager application={data} onUpdate={handleDataUpdate} />
                                                 )}
                                                 
                                                 {/* Document Verification Module */}
-                                                {(data.currentStage === 'document_verification' || data.currentStage === 'documents_verified' || data.status === 'documents-submitted' || data.status === 'documents-verified' || data.documents?.length > 0) && (
+                                                {(data.currentStage === 'document_verification' || data.currentStage === 'documents_verified' || 
+                                                  data.status === 'documents-submitted' || data.status === 'documents-verified' || 
+                                                  data.documents?.length > 0 ||
+                                                  data.pipelineProgress?.stageResults?.some(s => s.stageName === 'Document Verification' && s.status !== 'pending')) && (
                                                     <DocumentVerificationPanel application={data} onUpdate={handleDataUpdate} />
                                                 )}
                                                 
                                                 {/* Joining Letter Module */}
-                                                {(data.currentStage === 'documents_verified' || data.currentStage === 'joining_letter_issued' || data.currentStage === 'joined' || data.status === 'documents-verified' || data.joiningLetter?.generatedAt) && (
+                                                {(data.currentStage === 'documents_verified' || data.currentStage === 'joining_letter_issued' || 
+                                                  data.currentStage === 'joined' || data.status === 'documents-verified' || 
+                                                  data.joiningLetter?.generatedAt ||
+                                                  data.pipelineProgress?.stageResults?.some(s => s.stageName === 'Joining Letter' && ['in_progress', 'passed'].includes(s.status))) && (
                                                     <JoiningLetterManager application={data} onUpdate={handleDataUpdate} />
+                                                )}
+
+                                                {/* Employment Letter Module */}
+                                                {(data.overallStatus === 'Joined' ||
+                                                  data.joiningLetter?.generatedAt ||
+                                                  data.pipelineProgress?.stageResults?.some(s => s.stageName === 'Letter of Employment' && s.status !== 'pending')) && (
+                                                    <EmploymentLetterManager application={data} onUpdate={handleDataUpdate} />
                                                 )}
                                             </div>
                                         </div>

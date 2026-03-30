@@ -7,8 +7,23 @@ const {
     generateCompanyDescription,
     generateEligibilityRequirements,
     generateOfferLetter,
-    generateJoiningLetter
+    generateJoiningLetter,
+    generateEmploymentLetter
 } = require('../utils/aiServices');
+
+// ── Helper: map overallStatus to legacy status ─────────────────────────────────
+const OVERALL_TO_LEGACY = {
+    'Application Pending': 'pending',
+    'Application Under Review': 'under-review',
+    'Application Shortlisted': 'shortlisted',
+    'Application Rejected': 'rejected',
+    'In Progress': 'shortlisted',
+    'Selected': 'accepted',
+    'Offer Accepted': 'accepted',
+    'Offer Rejected': 'rejected',
+    'Joined': 'joined',
+    'Withdrawn': 'rejected'
+};
 
 // ── Update Job ────────────────────────────────────────────────────────────────
 exports.updateJob = async (req, res) => {
@@ -151,48 +166,61 @@ exports.updateApplicationStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes, stage } = req.body;
-        
+
         const application = await Application.findById(id);
         if (!application) return res.status(404).json({ message: 'Application not found' });
-        
-        if (status) application.status = status;
-        
+
+        // Support both overallStatus (new) and status (legacy)
+        const isOverallStatus = [
+            'Application Pending', 'Application Under Review', 'Application Shortlisted',
+            'Application Rejected', 'In Progress', 'Selected', 'Offer Accepted',
+            'Offer Rejected', 'Joined', 'Withdrawn'
+        ].includes(status);
+
+        if (isOverallStatus) {
+            application.overallStatus = status;
+            if (OVERALL_TO_LEGACY[status]) application.status = OVERALL_TO_LEGACY[status];
+        } else if (status) {
+            application.status = status;
+        }
+
         let newStage = stage;
         if (!newStage) {
-            // Map legacy status to new stage
-            switch (status) {
-                case 'under-review': newStage = 'under_review'; break;
-                case 'shortlisted': newStage = 'under_review'; break; // or assessment_assigned
-                case 'technical-interview': newStage = 'technical_interview'; break;
-                case 'hr-interview': newStage = 'hr_interview'; break;
-                case 'offered': newStage = 'offer_sent'; break;
-                case 'accepted': newStage = 'selected'; break;
-                case 'documents-submitted': newStage = 'document_verification'; break;
-                case 'documents-verified': newStage = 'documents_verified'; break;
-                case 'joined': newStage = 'joined'; break;
-                case 'rejected': newStage = 'rejected'; break;
-            }
+            const stageMap = {
+                'under-review': 'under_review', 'Application Under Review': 'under_review',
+                'shortlisted': 'under_review', 'Application Shortlisted': 'under_review',
+                'technical-interview': 'technical_interview',
+                'hr-interview': 'hr_interview',
+                'offered': 'offer_sent',
+                'accepted': 'selected', 'Selected': 'selected',
+                'documents-submitted': 'document_verification',
+                'documents-verified': 'documents_verified',
+                'joined': 'joined', 'Joined': 'joined',
+                'rejected': 'rejected', 'Application Rejected': 'rejected'
+            };
+            newStage = stageMap[status];
         }
-        
+
         if (newStage && newStage !== application.currentStage) {
             application.currentStage = newStage;
-            application.statusHistory.push({
-                stage: newStage,
-                timestamp: new Date(),
-                updatedBy: req.user._id,
-                notes: notes || `Status updated to ${status}`
-            });
             if (newStage === 'rejected') {
                 application.rejectedAt = new Date();
                 application.rejectionReason = notes || 'Rejected during review';
             }
-            if (newStage === 'joined') {
-                application.joinedAt = new Date();
-            }
+            if (newStage === 'joined') application.joinedAt = new Date();
         }
 
+        application.statusHistory.push({
+            stage: newStage || application.currentStage,
+            status: status,
+            timestamp: new Date(),
+            updatedBy: req.user._id,
+            notes: notes || `Status updated to ${status}`
+        });
+
+        application.updatedAt = new Date();
         await application.save();
-        res.json(application);
+        res.json({ success: true, data: application });
     } catch (error) {
         console.error('Update status error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -293,35 +321,57 @@ exports.generateOfferLetterEndpoint = async (req, res) => {
             .populate('studentId')
             .populate({ path: 'jobId', populate: { path: 'companyId' } })
             .populate('companyId');
-            
+
         if (!application) return res.status(404).json({ message: 'Application not found' });
-        
-        const { ctc, joiningDate, offerDetails } = req.body;
+
+        const { ctc, joiningDate, designation, department } = req.body;
         const studentName = application.studentId?.name || 'Candidate';
-        const jobTitle = application.jobId?.title || 'Position';
+        const jobTitle = designation || application.jobId?.title || 'Position';
         const companyName = application.companyId?.companyName || 'The Company';
         const finalCtc = ctc || application.jobId?.salary?.max || 0;
         const finalJoiningDate = joiningDate || 'To be decided';
-        
+
         const letter = await generateOfferLetter(studentName, jobTitle, companyName, finalCtc, finalJoiningDate);
-        
+
+        // Update legacy offer letter
         application.offerLetter = {
             generatedAt: new Date(),
             sentAt: new Date(),
             ctc: finalCtc,
-            joiningDate: new Date(finalJoiningDate) || undefined,
+            joiningDate: finalJoiningDate ? new Date(finalJoiningDate) : undefined,
             aiGeneratedContent: letter
         };
-        
+
+        // Also store in pipelineProgress stageResults if Offer Letter stage exists
+        if (application.pipelineProgress?.stageResults?.length > 0) {
+            const offerIdx = application.pipelineProgress.stageResults.findIndex(
+                s => s.stageName === 'Offer Letter'
+            );
+            if (offerIdx !== -1) {
+                application.pipelineProgress.stageResults[offerIdx].generatedLetter = {
+                    letterType: 'offer',
+                    letterContent: letter,
+                    generatedAt: new Date(),
+                    sentAt: new Date(),
+                    offerDetails: { ctc: finalCtc, joiningDate: finalJoiningDate, designation: jobTitle, department: department || application.jobId?.department }
+                };
+                application.pipelineProgress.stageResults[offerIdx].status = 'in_progress';
+                application.pipelineProgress.stageResults[offerIdx].startedAt = new Date();
+            }
+        }
+
         application.currentStage = 'offer_sent';
-        application.status = 'offered'; 
+        application.status = 'offered';
+        application.overallStatus = 'In Progress';
         application.statusHistory.push({
             stage: 'offer_sent',
+            status: 'In Progress',
             timestamp: new Date(),
             updatedBy: req.user._id,
-            notes: 'Offer letter generated and sent via AI'
+            notes: 'AI Offer letter generated and sent to student'
         });
-        
+
+        application.markModified('pipelineProgress');
         await application.save();
         res.json({ success: true, letter, data: application });
     } catch (err) {
@@ -335,9 +385,9 @@ exports.generateJoiningLetterEndpoint = async (req, res) => {
             .populate('studentId')
             .populate({ path: 'jobId', populate: { path: 'companyId' } })
             .populate('companyId');
-            
+
         if (!application) return res.status(404).json({ message: 'Application not found' });
-        
+
         const { joiningDate, reportingTime, reportingLocation, details } = req.body;
         const studentName = application.studentId?.name || 'Candidate';
         const jobTitle = application.jobId?.title || 'Position';
@@ -348,24 +398,96 @@ exports.generateJoiningLetterEndpoint = async (req, res) => {
         const finalLocation = reportingLocation || details?.location || 'Company Headquarters';
 
         const letter = await generateJoiningLetter(studentName, jobTitle, companyName, finalJoiningDate, finalTime, finalLocation);
-        
+
         application.joiningLetter = {
             generatedAt: new Date(),
             sentAt: new Date(),
-            joiningDate: new Date(finalJoiningDate) || undefined,
+            joiningDate: finalJoiningDate ? new Date(finalJoiningDate) : undefined,
             reportingTime: finalTime,
             reportingLocation: finalLocation,
             aiGeneratedContent: letter
         };
-        
+
+        // Also store in pipelineProgress stageResults if Joining Letter stage exists
+        if (application.pipelineProgress?.stageResults?.length > 0) {
+            const joinIdx = application.pipelineProgress.stageResults.findIndex(
+                s => s.stageName === 'Joining Letter'
+            );
+            if (joinIdx !== -1) {
+                application.pipelineProgress.stageResults[joinIdx].generatedLetter = {
+                    letterType: 'joining',
+                    letterContent: letter,
+                    generatedAt: new Date(),
+                    sentAt: new Date(),
+                    offerDetails: { joiningDate: finalJoiningDate, reportingLocation: finalLocation, reportingTime: finalTime }
+                };
+                application.pipelineProgress.stageResults[joinIdx].status = 'in_progress';
+                application.pipelineProgress.stageResults[joinIdx].startedAt = new Date();
+            }
+        }
+
         application.currentStage = 'joining_letter_issued';
         application.statusHistory.push({
             stage: 'joining_letter_issued',
+            status: 'In Progress',
             timestamp: new Date(),
             updatedBy: req.user._id,
-            notes: 'Joining letter generated and issued via AI'
+            notes: 'AI Joining letter generated and issued to student'
         });
-        
+
+        application.markModified('pipelineProgress');
+        await application.save();
+        res.json({ success: true, letter, data: application });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// ── NEW: Generate Employment Letter ──────────────────────────────────────────
+exports.generateEmploymentLetterEndpoint = async (req, res) => {
+    try {
+        const application = await Application.findById(req.params.id)
+            .populate('studentId')
+            .populate({ path: 'jobId', populate: { path: 'companyId' } })
+            .populate('companyId');
+
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+
+        const { employeeId } = req.body;
+        const studentName = application.studentId?.name || 'Employee';
+        const jobTitle = application.jobId?.title || 'Position';
+        const companyName = application.companyId?.companyName || 'The Company';
+        const joiningDate = application.offerLetter?.joiningDate?.toLocaleDateString('en-IN') ||
+            application.joinedAt?.toLocaleDateString('en-IN') || 'Date of Joining';
+
+        const letter = await generateEmploymentLetter(studentName, jobTitle, companyName, joiningDate, employeeId);
+
+        // Store in pipelineProgress stageResults if Letter of Employment stage exists
+        if (application.pipelineProgress?.stageResults?.length > 0) {
+            const empIdx = application.pipelineProgress.stageResults.findIndex(
+                s => s.stageName === 'Letter of Employment'
+            );
+            if (empIdx !== -1) {
+                application.pipelineProgress.stageResults[empIdx].generatedLetter = {
+                    letterType: 'employment',
+                    letterContent: letter,
+                    generatedAt: new Date(),
+                    sentAt: new Date()
+                };
+                application.pipelineProgress.stageResults[empIdx].status = 'passed';
+                application.pipelineProgress.stageResults[empIdx].completedAt = new Date();
+            }
+        }
+
+        application.statusHistory.push({
+            stage: 'employment_letter_issued',
+            status: 'Joined',
+            timestamp: new Date(),
+            updatedBy: req.user._id,
+            notes: 'AI Employment letter generated'
+        });
+
+        application.markModified('pipelineProgress');
         await application.save();
         res.json({ success: true, letter, data: application });
     } catch (err) {

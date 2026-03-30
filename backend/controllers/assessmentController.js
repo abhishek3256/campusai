@@ -226,18 +226,28 @@ exports.publishResults = async (req, res) => {
 
 // ── STUDENT ───────────────────────────────────────────────────────────────────
 
-// GET /assessment/student/assigned
+// GET /assessment/student/assigned — only shows exams for jobs the student applied to
 exports.getAssignedAssessments = async (req, res) => {
     try {
         const student = await Student.findOne({ userId: req.user._id });
         if (!student) return res.json({ success: true, data: [] });
 
-        // Get all jobs where the student's application is accepted, shortlisted, or in an interview stage
-        const applications = await require('../models/Application').find({ 
+        const Application = require('../models/Application');
+
+        // Find ALL jobs the student applied to (not rejected/withdrawn)
+        const applications = await Application.find({ 
             studentId: student._id,
-            status: { $in: ['accepted', 'shortlisted', 'technical-interview', 'hr-interview'] }
+            $or: [
+                { overallStatus: { $nin: ['Application Rejected', 'Withdrawn', 'Offer Rejected'] } },
+                { status: { $in: ['pending', 'under-review', 'shortlisted', 'accepted', 'technical-interview', 'hr-interview'] } }
+            ]
         });
-        const acceptedJobIds = applications.map(app => app.jobId);
+
+        const appliedJobIds = [...new Set(applications.map(app => app.jobId.toString()))];
+
+        if (appliedJobIds.length === 0) {
+            return res.json({ success: true, data: [] });
+        }
 
         const existingAttempts = await AssessmentAttempt.find({ 
             studentId: student._id,
@@ -245,13 +255,10 @@ exports.getAssignedAssessments = async (req, res) => {
         }).select('assessmentId');
         const completedIds = existingAttempts.map(a => a.assessmentId);
 
-        // Find assessments explicitly assigned OR linked to accepted jobs
+        // Find published assessments linked to jobs the student applied to
         const assessments = await Assessment.find({
             _id: { $nin: completedIds },
-            $or: [
-                { targetStudents: student._id },
-                { jobId: { $in: acceptedJobIds } }
-            ],
+            jobId: { $in: appliedJobIds },
             status: { $in: ['published', 'ongoing'] }
         })
         .populate('companyId', 'companyName logo')

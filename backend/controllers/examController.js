@@ -3,6 +3,7 @@ const ExamAttempt = require('../models/ExamAttempt');
 const Job = require('../models/Job');
 const Company = require('../models/Company');
 const Student = require('../models/Student');
+const Application = require('../models/Application');
 
 // ── COMPANY: Create Exam for a Job ──────────────────────────────────────────
 exports.createExam = async (req, res) => {
@@ -78,6 +79,23 @@ exports.getExamForStudent = async (req, res) => {
         const exam = await Exam.findById(req.params.examId);
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
         if (!exam.isPublished) return res.status(403).json({ success: false, message: 'Exam not yet available' });
+        
+        // ── NEW: Check if student has applied for this job ──────────────────
+        const student = await Student.findOne({ userId: req.user._id });
+        if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
+
+        const application = await Application.findOne({ 
+            studentId: student._id, 
+            jobId: exam.jobId,
+            overallStatus: { $nin: ['Application Rejected', 'Withdrawn'] } // Must have active application
+        });
+
+        if (!application) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'You must apply for this job before you can view the assessment.' 
+            });
+        }
 
         // Strip correct answers before sending to student
         const sanitized = {
@@ -101,6 +119,19 @@ exports.startAttempt = async (req, res) => {
 
         const student = await Student.findOne({ userId: req.user._id });
         if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+        // ── NEW: Verify application exists ──────────────────────────────────
+        const application = await Application.findOne({ 
+            studentId: student._id, 
+            jobId: exam.jobId,
+            overallStatus: { $nin: ['Application Rejected', 'Withdrawn'] }
+        });
+        if (!application) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Application required to start assessment' 
+            });
+        }
 
         // Check if already attempted
         const existing = await ExamAttempt.findOne({ examId: exam._id, studentId: student._id });

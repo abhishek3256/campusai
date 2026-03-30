@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Sparkles, Check, X } from 'lucide-react';
+import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Sparkles, Check, X, GitBranch, ChevronUp, ChevronDown } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -11,11 +11,28 @@ const TABS = [
     { id: 2, label: 'Eligibility', icon: GraduationCap },
     { id: 3, label: 'Skills', icon: Code2 },
     { id: 4, label: 'Timeline', icon: Calendar },
+    { id: 5, label: 'Pipeline', icon: GitBranch },
 ];
 
 const BRANCHES = ['Computer Science', 'Information Technology', 'Electronics', 'Electrical', 'Mechanical', 'Civil', 'Chemical', 'Biotechnology', 'MBA', 'MCA'];
 const EMPLOYMENT_TYPES = ['full-time', 'internship', 'contract', 'part-time'];
 const WORK_MODES = ['on-site', 'remote', 'hybrid'];
+
+const ALL_STAGES = [
+    { stageName: 'Application Screening', icon: '📋', description: 'Initial screening of applications' },
+    { stageName: 'Resume Shortlisting', icon: '📄', description: 'Review and shortlist resumes' },
+    { stageName: 'Online Assessment', icon: '💻', description: 'Online aptitude/technical test' },
+    { stageName: 'Technical Round', icon: '🔧', description: 'Technical interview round' },
+    { stageName: 'Managerial Round', icon: '👔', description: 'Managerial interview round' },
+    { stageName: 'HR Round', icon: '🤝', description: 'HR interview round' },
+    { stageName: 'Group Discussion', icon: '👥', description: 'Group discussion round' },
+    { stageName: 'Case Study', icon: '📊', description: 'Case study presentation' },
+    { stageName: 'Final Interview', icon: '⭐', description: 'Final decision interview' },
+    { stageName: 'Offer Letter', icon: '💌', description: 'AI-generated offer letter' },
+    { stageName: 'Document Verification', icon: '🔍', description: 'Verify student documents' },
+    { stageName: 'Joining Letter', icon: '📝', description: 'AI-generated joining instructions' },
+    { stageName: 'Letter of Employment', icon: '🏆', description: 'Official employment confirmation letter' },
+];
 
 const Field = ({ label, required, children }) => (
     <div>
@@ -66,6 +83,133 @@ const TagInput = ({ tags, onAdd, onRemove, placeholder }) => {
     );
 };
 
+// ── Pipeline Builder Component ────────────────────────────────────────────────
+const PipelineBuilder = ({ stages, onStagesChange }) => {
+    const toggleStage = (stageName) => {
+        const idx = stages.findIndex(s => s.stageName === stageName);
+        if (idx === -1) {
+            const newStage = {
+                stageId: `stage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                stageName,
+                order: stages.length + 1,
+                isEnabled: true,
+                isRequired: true
+            };
+            onStagesChange([...stages, newStage]);
+        } else {
+            onStagesChange(stages.filter(s => s.stageName !== stageName));
+        }
+    };
+
+    const isEnabled = (stageName) => stages.some(s => s.stageName === stageName);
+
+    const moveStage = (idx, dir) => {
+        const newStages = [...stages];
+        const target = idx + dir;
+        if (target < 0 || target >= newStages.length) return;
+        [newStages[idx], newStages[target]] = [newStages[target], newStages[idx]];
+        onStagesChange(newStages.map((s, i) => ({ ...s, order: i + 1 })));
+    };
+
+    const toggleRequired = (idx) => {
+        const newStages = [...stages];
+        newStages[idx] = { ...newStages[idx], isRequired: !newStages[idx].isRequired };
+        onStagesChange(newStages);
+    };
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Available Stages — Click to Add</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {ALL_STAGES.map(stage => {
+                        const active = isEnabled(stage.stageName);
+                        return (
+                            <button
+                                key={stage.stageName}
+                                type="button"
+                                onClick={() => toggleStage(stage.stageName)}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-xs font-medium text-left transition-all ${
+                                    active
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                }`}
+                            >
+                                <span className="text-base">{stage.icon}</span>
+                                <div>
+                                    <div>{stage.stageName}</div>
+                                    {active && <div className="text-green-600 dark:text-green-400 text-xs">✓ Added</div>}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {stages.length > 0 && (
+                <div>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        Your Pipeline — Drag to Reorder ({stages.length} stages)
+                    </h3>
+                    <div className="space-y-2">
+                        {stages.map((stage, idx) => {
+                            const stageInfo = ALL_STAGES.find(s => s.stageName === stage.stageName);
+                            return (
+                                <div
+                                    key={stage.stageId || idx}
+                                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 group"
+                                >
+                                    <div className="flex flex-col gap-0.5">
+                                        <button type="button" onClick={() => moveStage(idx, -1)} disabled={idx === 0}
+                                            className="p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30">
+                                            <ChevronUp className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button type="button" onClick={() => moveStage(idx, 1)} disabled={idx === stages.length - 1}
+                                            className="p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30">
+                                            <ChevronDown className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                    <div className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold flex-shrink-0">
+                                        {idx + 1}
+                                    </div>
+                                    <span className="text-lg">{stageInfo?.icon || '📌'}</span>
+                                    <div className="flex-1">
+                                        <span className="text-sm font-medium text-gray-900 dark:text-white">{stage.stageName}</span>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{stageInfo?.description}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleRequired(idx)}
+                                        className={`text-xs px-2 py-1 rounded-lg border ${
+                                            stage.isRequired
+                                                ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                                                : 'border-gray-200 text-gray-500 dark:border-gray-600 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {stage.isRequired ? 'Required' : 'Optional'}
+                                    </button>
+                                    <button type="button" onClick={() => toggleStage(stage.stageName)}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {stages.length === 0 && (
+                <div className="text-center py-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+                    <GitBranch className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No pipeline stages added yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Click stages above to add them to your pipeline</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function PostJob() {
     const navigate = useNavigate();
     const [tab, setTab] = useState(0);
@@ -87,7 +231,9 @@ export default function PostJob() {
         // Tab 3 - Skills
         mustHave: [], goodToHave: [], technologies: [],
         // Tab 4 - Timeline
-        applicationDeadline: '', shortlistingDate: '', examDate: '', interviewDate: '', finalSelectionDate: ''
+        applicationDeadline: '', shortlistingDate: '', examDate: '', interviewDate: '', finalSelectionDate: '',
+        // Tab 5 - Pipeline
+        pipelineStages: []
     });
 
     const set = (field, val) => setForm(p => ({ ...p, [field]: val }));
@@ -164,7 +310,7 @@ export default function PostJob() {
                     academicRequirements: form.academicRequirements
                 },
                 skills: { mustHave: form.mustHave, goodToHave: form.goodToHave, technologies: form.technologies },
-                requirements: { skills: form.mustHave }, // backward compat
+                requirements: { skills: form.mustHave },
                 timeline: {
                     applicationDeadline: form.applicationDeadline || null,
                     shortlistingDate: form.shortlistingDate || null,
@@ -173,6 +319,11 @@ export default function PostJob() {
                     finalSelectionDate: form.finalSelectionDate || null,
                 },
                 deadline: form.applicationDeadline || null,
+                // Pipeline
+                recruitmentPipeline: {
+                    stages: form.pipelineStages,
+                    autoRejectOnFailure: false
+                }
             };
             await api.post('/company/jobs', payload);
             toast.success('Job posted successfully!');
@@ -381,6 +532,40 @@ export default function PostJob() {
                                 </div>
                             </div>
                         )}
+
+                        {/* ── TAB 5: Pipeline ── */}
+                        {tab === 5 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recruitment Pipeline</h2>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                            Define the hiring stages students will go through. AI will auto-generate letters for Offer, Joining, and Employment stages.
+                                        </p>
+                                    </div>
+                                    {form.pipelineStages.length > 0 && (
+                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                                            {form.pipelineStages.length} stages
+                                        </span>
+                                    )}
+                                </div>
+
+                                <PipelineBuilder
+                                    stages={form.pipelineStages}
+                                    onStagesChange={stages => set('pipelineStages', stages)}
+                                />
+
+                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                    <p className="font-semibold mb-1">💡 Pipeline Tips</p>
+                                    <ul className="list-disc ml-4 space-y-1">
+                                        <li>Add <strong>Online Assessment</strong> to automatically link any exam you create for this job</li>
+                                        <li>Add <strong>Offer Letter</strong> to enable AI-powered offer letter generation</li>
+                                        <li>Add <strong>Document Verification</strong> to collect student documents</li>
+                                        <li>Add <strong>Joining Letter</strong> and <strong>Letter of Employment</strong> for post-selection stages</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
 
                     {/* Navigation */}
@@ -389,7 +574,7 @@ export default function PostJob() {
                             className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl disabled:opacity-40 hover:border-blue-300 transition-all">
                             <ChevronLeft className="w-4 h-4" /> Back
                         </button>
-                        {tab < 4 ? (
+                        {tab < 5 ? (
                             <button type="button" onClick={() => setTab(t => t + 1)}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">
                                 Next <ChevronRight className="w-4 h-4" />

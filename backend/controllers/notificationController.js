@@ -9,12 +9,36 @@ const User = require('../models/User');
 
 // ── STATUS helpers ────────────────────────────────────────────────────────────
 const STATUS_ICON = {
+    // Legacy statuses
     pending:     '⏳', 'under-review': '🔍', shortlisted: '✅',
-    rejected:    '❌', accepted:       '🎉', 'verification-failed': '⚠️'
+    rejected:    '❌', accepted:       '🎉', 'verification-failed': '⚠️',
+    // New overallStatus
+    'Application Pending':      '📋',
+    'Application Under Review': '🔍',
+    'Application Shortlisted':  '✅',
+    'Application Rejected':     '❌',
+    'In Progress':              '⚙️',
+    'Selected':                 '🎉',
+    'Offer Accepted':           '🤝',
+    'Offer Rejected':           '🚫',
+    'Joined':                   '🏢',
+    'Withdrawn':                '↩️'
 };
 const STATUS_COLOR = {
+    // Legacy
     pending:     'gray',  'under-review': 'blue', shortlisted: 'green',
-    rejected:    'red',   accepted:       'green', 'verification-failed': 'orange'
+    rejected:    'red',   accepted:       'green', 'verification-failed': 'orange',
+    // New
+    'Application Pending':      'gray',
+    'Application Under Review': 'blue',
+    'Application Shortlisted':  'green',
+    'Application Rejected':     'red',
+    'In Progress':              'indigo',
+    'Selected':                 'emerald',
+    'Offer Accepted':           'teal',
+    'Offer Rejected':           'red',
+    'Joined':                   'purple',
+    'Withdrawn':                'gray'
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -49,25 +73,61 @@ exports.getStudentNotifications = async (req, res) => {
         for (const app of apps) {
             const company = app.companyId?.companyName || 'Company';
             const job = app.jobId?.title || 'Job';
-            const icon = STATUS_ICON[app.status] || '📋';
 
-            let title = '', body = '', color = STATUS_COLOR[app.status] || 'gray';
+            // Prefer new overallStatus, fall back to legacy
+            const displayStatus = app.overallStatus || app.status;
+            const icon = STATUS_ICON[displayStatus] || '📋';
+            let title = '', body = '', color = STATUS_COLOR[displayStatus] || 'gray';
 
-            if (app.status === 'shortlisted') {
-                title = 'Resume Shortlisted! 🎉';
-                body = `Your resume was shortlisted for ${job} at ${company}`;
-            } else if (app.status === 'rejected') {
-                title = 'Application Update';
-                body = `Your application for ${job} at ${company} was not selected this time`;
-            } else if (app.status === 'accepted') {
-                title = 'Offer Letter Available! 🎊';
-                body = `Congratulations! You have been selected for ${job} at ${company}`;
-            } else if (app.status === 'under-review') {
-                title = 'Application Under Review';
-                body = `${company} is reviewing your application for ${job}`;
+            // New overallStatus notifications
+            if (app.overallStatus) {
+                switch (app.overallStatus) {
+                    case 'Application Shortlisted':
+                        title = '✅ Application Shortlisted!';
+                        body = `Your application for ${job} at ${company} has been shortlisted!`;
+                        break;
+                    case 'Application Under Review':
+                        title = '🔍 Application Under Review';
+                        body = `${company} is reviewing your application for ${job}`;
+                        break;
+                    case 'Application Rejected':
+                        title = '❌ Application Update';
+                        body = `Your application for ${job} at ${company} was not selected this time. Keep trying!`;
+                        break;
+                    case 'In Progress':
+                        title = '⚙️ Moving Through Pipeline!';
+                        body = `You have advanced to the next stage for ${job} at ${company}`;
+                        break;
+                    case 'Selected':
+                        title = '🎉 Congratulations — You are SELECTED!';
+                        body = `You have been selected for ${job} at ${company}! Check your offer letter.`;
+                        color = 'emerald';
+                        break;
+                    case 'Offer Accepted':
+                        title = '🤝 Offer Accepted!';
+                        body = `Your offer for ${job} at ${company} has been accepted.`;
+                        break;
+                    case 'Joined':
+                        title = '🏢 Welcome to the Team!';
+                        body = `You have officially joined ${company} as ${job}. All the best!`;
+                        break;
+                    default:
+                        title = `${icon} Application Update`;
+                        body = `Your application for ${job} at ${company} is now: ${app.overallStatus}`;
+                }
             } else {
-                title = `Application ${icon}`;
-                body = `Your application for ${job} at ${company} is ${app.status}`;
+                // Legacy status fallback
+                if (app.status === 'shortlisted') {
+                    title = 'Resume Shortlisted! 🎉'; body = `Your resume was shortlisted for ${job} at ${company}`;
+                } else if (app.status === 'rejected') {
+                    title = 'Application Update'; body = `Your application for ${job} at ${company} was not selected this time`;
+                } else if (app.status === 'accepted') {
+                    title = 'Offer Letter Available! 🎊'; body = `Congratulations! You have been selected for ${job} at ${company}`;
+                } else if (app.status === 'under-review') {
+                    title = 'Application Under Review'; body = `${company} is reviewing your application for ${job}`;
+                } else {
+                    title = `Application ${icon}`; body = `Your application for ${job} at ${company} is ${app.status}`;
+                }
             }
 
             // Interview schedule embedded in application

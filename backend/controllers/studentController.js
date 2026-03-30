@@ -486,6 +486,20 @@ exports.uploadApplicationDocument = async (req, res) => {
             uploadedAt: new Date()
         });
         
+        // Update pipelineProgress for Document Verification stage
+        if (application.pipelineProgress?.stageResults?.length > 0) {
+            const docStageIdx = application.pipelineProgress.stageResults.findIndex(
+                s => s.stageName === 'Document Verification'
+            );
+            if (docStageIdx !== -1) {
+                application.pipelineProgress.stageResults[docStageIdx].status = 'in_progress';
+                if (!application.pipelineProgress.stageResults[docStageIdx].startedAt) {
+                    application.pipelineProgress.stageResults[docStageIdx].startedAt = new Date();
+                }
+                application.markModified('pipelineProgress');
+            }
+        }
+        
         // Auto advance stage
         if (application.currentStage === 'offer_accepted' || application.status === 'accepted') {
             application.currentStage = 'document_verification';
@@ -522,7 +536,33 @@ exports.respondToOffer = async (req, res) => {
         if (response === 'accept') {
             application.currentStage = 'offer_accepted';
             application.status = 'accepted';
+            application.overallStatus = 'In Progress'; // Maintain pipeline status
             application.offerLetter.acceptedAt = new Date();
+            
+            // Update pipelineProgress
+            if (application.pipelineProgress?.stageResults?.length > 0) {
+                const offerIdx = application.pipelineProgress.stageResults.findIndex(
+                    s => s.stageName === 'Offer Letter'
+                );
+                if (offerIdx !== -1) {
+                    application.pipelineProgress.stageResults[offerIdx].status = 'passed';
+                    application.pipelineProgress.stageResults[offerIdx].completedAt = new Date();
+                    
+                    // Move to the next stage (Document Verification) automatically
+                    const nextStageIdx = application.pipelineProgress.stageResults.findIndex(
+                        s => s.status === 'pending' || s.status === 'in_progress'
+                    );
+                    if (nextStageIdx !== -1 && nextStageIdx > offerIdx) {
+                         const nextStage = application.pipelineProgress.stageResults[nextStageIdx];
+                         if (nextStage.stageName === 'Document Verification') {
+                             nextStage.status = 'in_progress';
+                             nextStage.startedAt = new Date();
+                         }
+                    }
+                    application.markModified('pipelineProgress');
+                }
+            }
+            
             application.statusHistory.push({
                 stage: 'offer_accepted',
                 timestamp: new Date(),
@@ -532,7 +572,20 @@ exports.respondToOffer = async (req, res) => {
         } else if (response === 'reject') {
             application.currentStage = 'offer_declined';
             application.status = 'rejected';
+            application.overallStatus = 'Offer Rejected';
             application.offerLetter.rejectedAt = new Date();
+
+            // Fail pipeline
+            if (application.pipelineProgress?.stageResults?.length > 0) {
+                const offerIdx = application.pipelineProgress.stageResults.findIndex(
+                    s => s.stageName === 'Offer Letter'
+                );
+                if (offerIdx !== -1) {
+                    application.pipelineProgress.stageResults[offerIdx].status = 'failed';
+                    application.markModified('pipelineProgress');
+                }
+            }
+
             application.statusHistory.push({
                 stage: 'offer_declined',
                 timestamp: new Date(),
