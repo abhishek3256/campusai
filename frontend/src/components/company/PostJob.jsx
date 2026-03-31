@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Sparkles, Check, X, GitBranch, ChevronUp, ChevronDown } from 'lucide-react';
@@ -28,19 +28,6 @@ export default function PostJob() {
     const [generatingCompany, setGeneratingCompany] = useState(false);
     const [generatingEligibility, setGeneratingEligibility] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-
-    // Guard against accidental refresh/close if form data exists
-    useEffect(() => {
-        const handleBeforeUnload = (e) => {
-            // Check if title or company name are filled out (proxy for 'dirty' form)
-            if (form.title || form.companyDisplayName || (form.pipelineStages && form.pipelineStages.length > 0)) {
-                e.preventDefault();
-                e.returnValue = ''; // Standard browser trigger for unsaved changes warning
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [form.title, form.companyDisplayName, form.pipelineStages]);
 
     const [form, setForm] = useState({
         // Tab 0 - Company

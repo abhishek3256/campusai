@@ -63,19 +63,6 @@ export default function EditJobPage() {
     const [generatingDesc, setGeneratingDesc] = useState(false);
     const [generatingCompany, setGeneratingCompany] = useState(false);
     const [generatingEligibility, setGeneratingEligibility] = useState(false);
-    const [isDirty, setIsDirty] = useState(false);
-
-    // Guard against accidental refresh/close if form has been edited
-    useEffect(() => {
-        const handleBeforeUnload = (e) => {
-            if (isDirty) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [isDirty]);
 
     const [form, setForm] = useState({
         companyDisplayName: '', companyWebsite: '', industryType: '', companyDescription: '',
@@ -131,18 +118,12 @@ export default function EditJobPage() {
         load();
     }, [id]);
 
-    const set = (field, val) => { setForm(p => ({ ...p, [field]: val })); setIsDirty(true); };
-    const addTag = (field, val) => { setForm(p => ({ ...p, [field]: [...p[field], val] })); setIsDirty(true); };
-    const removeTag = (field, idx) => { setForm(p => ({ ...p, [field]: p[field].filter((_, i) => i !== idx) })); setIsDirty(true); };
-    const toggleBranch = (b) => {
-        setForm(p => {
-            const newBranches = p.branches.includes(b)
-                ? p.branches.filter(x => x !== b)
-                : [...p.branches, b];
-            return { ...p, branches: newBranches };
-        });
-        setIsDirty(true);
-    };
+    const set = (field, val) => setForm(p => ({ ...p, [field]: val }));
+    const addTag = (field, val) => setForm(p => ({ ...p, [field]: [...p[field], val] }));
+    const removeTag = (field, idx) => setForm(p => ({ ...p, [field]: p[field].filter((_, i) => i !== idx) }));
+    const toggleBranch = (b) => form.branches.includes(b)
+        ? setForm(p => ({ ...p, branches: p.branches.filter(x => x !== b) }))
+        : setForm(p => ({ ...p, branches: [...p.branches, b] }));
 
     const handleGenerateDesc = async () => {
         if (!form.title) return toast.error('Enter a job title first');
