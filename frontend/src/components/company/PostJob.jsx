@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Sparkles, Check, X, GitBranch, ChevronUp, ChevronDown } from 'lucide-react';
+import { Building2, Briefcase, GraduationCap, Code2, Calendar, ChevronRight, ChevronLeft, Sparkles, Check, X, GitBranch, ChevronUp, ChevronDown, Save } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import PipelineBuilder from './PipelineBuilder';
@@ -18,6 +18,51 @@ const TABS = [
 const BRANCHES = ['Computer Science', 'Information Technology', 'Electronics', 'Electrical', 'Mechanical', 'Civil', 'Chemical', 'Biotechnology', 'MBA', 'MCA'];
 const EMPLOYMENT_TYPES = ['full-time', 'internship', 'contract', 'part-time'];
 const WORK_MODES = ['on-site', 'remote', 'hybrid'];
+
+// Helper Components
+const Field = ({ label, required, children }) => (
+    <div className="space-y-1.5">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {label}{required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {children}
+    </div>
+);
+
+const inputCls = "w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm";
+
+const Input = (props) => <input {...props} className={`${inputCls} ${props.className || ''}`} />;
+const Textarea = (props) => <textarea {...props} className={`${inputCls} resize-none ${props.className || ''}`} />;
+const Select = (props) => <select {...props} className={`${inputCls} ${props.className || ''}`} />;
+
+const TagInput = ({ tags, onAdd, onRemove, placeholder }) => {
+    const [input, setInput] = useState('');
+    const handleAdd = () => {
+        const val = input.trim();
+        if (val && !tags.includes(val)) {
+            onAdd(val);
+            setInput('');
+        }
+    };
+    return (
+        <div className="space-y-2">
+            <div className="flex gap-2">
+                <Input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAdd())} placeholder={placeholder} />
+                <button type="button" onClick={handleAdd} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium">Add</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                {tags.map((t, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">
+                        {t}
+                        <button type="button" onClick={() => onRemove(i)} className="hover:text-blue-900 dark:hover:text-blue-100">
+                            <X className="w-3 h-3" />
+                        </button>
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 // PipelineBuilder moved to separate file
 
@@ -392,8 +437,8 @@ export default function PostJob() {
                             </button>
                         ) : (
                             <button type="submit" disabled={submitting}
-                                className="flex items-center gap-2 px-8 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl font-semibold">
-                                {submitting ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Posting...</> : '🚀 Post Job'}
+                                className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-semibold">
+                                {submitting ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Posting...</> : <>🚀 Post Job</>}
                             </button>
                         )}
                     </div>
