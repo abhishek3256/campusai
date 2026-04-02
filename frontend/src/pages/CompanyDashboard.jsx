@@ -26,15 +26,25 @@ const CompanyDashboard = () => {
     const fetchJobs = async () => {
         try {
             const { data } = await api.get('/company/jobs');
-            setJobs(data);
-        } catch (error) { console.error(error); }
+            setJobs(Array.isArray(data) ? data : []);
+        } catch (error) { 
+            console.error(error); 
+            setJobs([]);
+        }
     };
 
     const fetchAssessments = async () => {
         try {
             const { data } = await api.get('/assessment');
-            if (data.success) setAssessments(data.data);
-        } catch (error) { console.error(error); }
+            if (data.success && Array.isArray(data.data)) {
+                setAssessments(data.data);
+            } else {
+                setAssessments([]);
+            }
+        } catch (error) { 
+            console.error(error); 
+            setAssessments([]);
+        }
     };
 
     const handleDeleteJobClick = (jobId) => {
@@ -154,21 +164,21 @@ const CompanyDashboard = () => {
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 dark:text-gray-400 text-sm">Active Jobs</p>
-                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{jobs.filter(j => j.isActive).length}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{Array.isArray(jobs) ? jobs.filter(j => j.isActive).length : 0}</h3>
                     </div>
                     <Briefcase className="w-10 h-10 text-blue-500 opacity-20" />
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 dark:text-gray-400 text-sm">Total Applicants</p>
-                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{jobs.reduce((acc, job) => acc + (job.applications?.length || 0), 0)}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{Array.isArray(jobs) ? jobs.reduce((acc, job) => acc + (job.applications?.length || 0), 0) : 0}</h3>
                     </div>
                     <Users className="w-10 h-10 text-green-500 opacity-20" />
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 dark:text-gray-400 text-sm">Total Vacancies</p>
-                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{jobs.reduce((acc, j) => acc + (j.vacancies || 0), 0)}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{Array.isArray(jobs) ? jobs.reduce((acc, j) => acc + (j.vacancies || 0), 0) : 0}</h3>
                     </div>
                     <Trophy className="w-10 h-10 text-amber-500 opacity-20" />
                 </div>
